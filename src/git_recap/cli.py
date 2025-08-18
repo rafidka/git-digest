@@ -1,5 +1,6 @@
 import logging
 import os
+from collections import defaultdict
 from pathlib import Path
 
 import typer
@@ -56,6 +57,15 @@ def format_commits_for_llm(commits: list[GitCommit]) -> str:
     return "\n---\n".join(formatted)
 
 
+def group_commits_by_author(commits: list[GitCommit]) -> dict[str, list[GitCommit]]:
+    """Group commits by author email."""
+    author_commits: dict[str, list[GitCommit]] = defaultdict(list)
+    for commit in commits:
+        author_key = f"{commit.author} <{commit.email}>"
+        author_commits[author_key].append(commit)
+    return dict(author_commits)
+
+
 def summarize_with_llm(commits_text: str) -> str:
     """Use Cohere to summarize git commits."""
     client = get_cohere_client()
@@ -85,6 +95,55 @@ Summary:"""
         raise typer.Exit(1)
 
 
+def summarize_by_author(author_commits: dict[str, list[GitCommit]]) -> str:
+    """Generate author-specific summaries using LLM."""
+    client = get_cohere_client()
+    
+    summaries: list[str] = []
+    
+    for author, commits in author_commits.items():
+        logger.debug(f"Generating summary for {author} ({len(commits)} commits)")
+        
+        commits_text = format_commits_for_llm(commits)
+        
+        prompt = f"""Please provide a concise summary of the contributions made by {author}.
+Focus on the key changes, features, and improvements they implemented.
+Be specific about what they accomplished.
+
+Commits by {author}:
+{commits_text}
+
+Summary for {author}:"""
+        
+        try:
+            response = client.chat.completions.create(
+                model="command-r-plus",
+                messages=[
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=500,
+                temperature=0.3,
+            )
+            
+            content = response.choices[0].message.content
+            author_summary = content.strip() if content else ""
+            
+            commit_count = len(commits)
+            commit_word = "commit" if commit_count == 1 else "commits"
+            
+            summaries.append(
+                f"## {author} ({commit_count} {commit_word})\n\n{author_summary}"
+            )
+            
+        except Exception as e:
+            logger.error(f"Error generating summary for {author}: {str(e)}")
+            summaries.append(
+                f"## {author} ({len(commits)} commits)\n\nError generating summary for this author."
+            )
+    
+    return "\n\n".join(summaries)
+
+
 @app.command()
 def recap(
     repo_path: str = typer.Argument(".", help="Path to the git repository"),
@@ -108,6 +167,11 @@ def recap(
         "--debug",
         help="Enable debug logging",
     ),
+    by_author: bool = typer.Option(
+        False,
+        "--by-author",
+        help="Group summary by author instead of chronological overview",
+    ),
 ):
     """
     Generate a human-readable summary of recent git commits.
@@ -116,7 +180,7 @@ def recap(
     if debug:
         logger.debug("Starting git-recap with debug logging enabled")
     
-    logger.debug(f"Command arguments: repo_path={repo_path}, since={since}, until={until}, days={days}")
+    logger.debug(f"Command arguments: repo_path={repo_path}, since={since}, until={until}, days={days}, by_author={by_author}")
     
     repo_path_obj = Path(repo_path)
     if not repo_path_obj.exists():
@@ -159,16 +223,30 @@ def recap(
 
         logger.info(f"Found {len(commits)} commits. Generating summary...")
 
-        logger.debug("Formatting commits for LLM processing")
-        commits_text = format_commits_for_llm(commits)
-        logger.debug("Calling LLM for summary generation")
-        summary = summarize_with_llm(commits_text)
+        if by_author:
+            logger.debug("Grouping commits by author")
+            author_commits = group_commits_by_author(commits)
+            logger.info(f"Found {len(author_commits)} unique authors")
+            
+            logger.debug("Generating author-specific summaries")
+            summary = summarize_by_author(author_commits)
+            
+            print("\n" + "=" * 60)
+            print("GIT RECAP SUMMARY - BY AUTHOR")
+            print("=" * 60)
+            print(summary)
+            print("=" * 60)
+        else:
+            logger.debug("Formatting commits for LLM processing")
+            commits_text = format_commits_for_llm(commits)
+            logger.debug("Calling LLM for summary generation")
+            summary = summarize_with_llm(commits_text)
 
-        print("\n" + "=" * 50)
-        print("GIT RECAP SUMMARY")
-        print("=" * 50)
-        print(summary)
-        print("=" * 50)
+            print("\n" + "=" * 50)
+            print("GIT RECAP SUMMARY")
+            print("=" * 50)
+            print(summary)
+            print("=" * 50)
 
     except Exception as e:
         logger.error(f"Error: {str(e)}")
