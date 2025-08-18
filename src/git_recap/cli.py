@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 
@@ -6,16 +7,29 @@ from openai import OpenAI
 
 from .git_utils import GitCommit, GitCommitRetriever
 
+logger = logging.getLogger(__name__)
+
 app = typer.Typer()
+
+
+def setup_logging(debug: bool = False) -> None:
+    """Configure logging based on debug flag."""
+    level = logging.DEBUG if debug else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
 
 def get_cohere_client() -> OpenAI:
     """Initialize Cohere client using OpenAI SDK."""
     api_key = os.getenv("COHERE_API_KEY")
     if not api_key:
-        typer.echo("Error: COHERE_API_KEY environment variable not set", err=True)
+        logger.error("COHERE_API_KEY environment variable not set")
         raise typer.Exit(1)
 
+    logger.debug("Initializing Cohere client with OpenAI SDK")
     return OpenAI(base_url="https://api.cohere.ai/compatibility/v1", api_key=api_key)
 
 
@@ -67,7 +81,7 @@ Summary:"""
         return content.strip() if content else ""
 
     except Exception as e:
-        typer.echo(f"Error calling Cohere API: {str(e)}", err=True)
+        logger.error(f"Error calling Cohere API: {str(e)}")
         raise typer.Exit(1)
 
 
@@ -89,26 +103,38 @@ def recap(
         "-d",
         help="Get commits from the last N days (overrides since/until)",
     ),
+    debug: bool = typer.Option(
+        False,
+        "--debug",
+        help="Enable debug logging",
+    ),
 ):
     """
     Generate a human-readable summary of recent git commits.
     """
+    setup_logging(debug)
+    if debug:
+        logger.debug("Starting git-recap with debug logging enabled")
+    
+    logger.debug(f"Command arguments: repo_path={repo_path}, since={since}, until={until}, days={days}")
+    
     repo_path_obj = Path(repo_path)
     if not repo_path_obj.exists():
-        typer.echo(f"Error: Repository path '{repo_path}' does not exist", err=True)
+        logger.error(f"Repository path '{repo_path}' does not exist")
         raise typer.Exit(1)
 
     if not (repo_path_obj / ".git").exists():
-        typer.echo(f"Error: '{repo_path}' is not a git repository", err=True)
+        logger.error(f"'{repo_path}' is not a git repository")
         raise typer.Exit(1)
 
-    typer.echo(f"Analyzing git repository: {repo_path}")
+    logger.info(f"Analyzing git repository: {repo_path}")
 
     try:
+        logger.debug(f"Initializing GitCommitRetriever for path: {repo_path_obj}")
         retriever = GitCommitRetriever(str(repo_path_obj))
 
         if days is not None:
-            typer.echo(f"Retrieving commits from the last {days} days...")
+            logger.info(f"Retrieving commits from the last {days} days...")
             commits = retriever.get_recent_commits(days)
         else:
             if since or until:
@@ -117,9 +143,9 @@ def recap(
                     date_info.append(f"since {since}")
                 if until:
                     date_info.append(f"until {until}")
-                typer.echo(f"Retrieving commits {' '.join(date_info)}...")
+                logger.info(f"Retrieving commits {' '.join(date_info)}...")
             else:
-                typer.echo("Retrieving commits from the last 7 days...")
+                logger.info("Retrieving commits from the last 7 days...")
                 commits = retriever.get_recent_commits(7)
 
             if since or until:
@@ -128,22 +154,24 @@ def recap(
                 commits = retriever.get_recent_commits(7)
 
         if not commits:
-            typer.echo("No commits found in the specified date range.")
+            logger.warning("No commits found in the specified date range.")
             return
 
-        typer.echo(f"Found {len(commits)} commits. Generating summary...")
+        logger.info(f"Found {len(commits)} commits. Generating summary...")
 
+        logger.debug("Formatting commits for LLM processing")
         commits_text = format_commits_for_llm(commits)
+        logger.debug("Calling LLM for summary generation")
         summary = summarize_with_llm(commits_text)
 
-        typer.echo("\n" + "=" * 50)
-        typer.echo("GIT RECAP SUMMARY")
-        typer.echo("=" * 50)
-        typer.echo(summary)
-        typer.echo("=" * 50)
+        print("\n" + "=" * 50)
+        print("GIT RECAP SUMMARY")
+        print("=" * 50)
+        print(summary)
+        print("=" * 50)
 
     except Exception as e:
-        typer.echo(f"Error: {str(e)}", err=True)
+        logger.error(f"Error: {str(e)}")
         raise typer.Exit(1)
 
 
