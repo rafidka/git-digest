@@ -162,6 +162,12 @@ def recap(
         "-d",
         help="Get commits from the last N days (overrides since/until)",
     ),
+    count: int | None = typer.Option(
+        None,
+        "--count",
+        "-c",
+        help="Get the last N commits (overrides since/until/days)",
+    ),
     debug: bool = typer.Option(
         False,
         "--debug",
@@ -180,7 +186,7 @@ def recap(
     if debug:
         logger.debug("Starting git-recap with debug logging enabled")
     
-    logger.debug(f"Command arguments: repo_path={repo_path}, since={since}, until={until}, days={days}, by_author={by_author}")
+    logger.debug(f"Command arguments: repo_path={repo_path}, since={since}, until={until}, days={days}, count={count}, by_author={by_author}")
     
     repo_path_obj = Path(repo_path)
     if not repo_path_obj.exists():
@@ -197,28 +203,30 @@ def recap(
         logger.debug(f"Initializing GitCommitRetriever for path: {repo_path_obj}")
         retriever = GitCommitRetriever(str(repo_path_obj))
 
-        if days is not None:
+        # Parameter precedence: count > days > since/until > default
+        if count is not None:
+            logger.info(f"Retrieving the last {count} commits...")
+            commits = retriever.get_recent_commits_by_count(count)
+        elif days is not None:
             logger.info(f"Retrieving commits from the last {days} days...")
             commits = retriever.get_recent_commits(days)
+        elif since or until:
+            date_info: list[str] = []
+            if since:
+                date_info.append(f"since {since}")
+            if until:
+                date_info.append(f"until {until}")
+            logger.info(f"Retrieving commits {' '.join(date_info)}...")
+            commits = retriever.get_commits(since=since, until=until)
         else:
-            if since or until:
-                date_info: list[str] = []
-                if since:
-                    date_info.append(f"since {since}")
-                if until:
-                    date_info.append(f"until {until}")
-                logger.info(f"Retrieving commits {' '.join(date_info)}...")
-            else:
-                logger.info("Retrieving commits from the last 7 days...")
-                commits = retriever.get_recent_commits(7)
-
-            if since or until:
-                commits = retriever.get_commits(since=since, until=until)
-            else:
-                commits = retriever.get_recent_commits(7)
+            logger.info("Retrieving commits from the last 7 days...")
+            commits = retriever.get_recent_commits(7)
 
         if not commits:
-            logger.warning("No commits found in the specified date range.")
+            if count is not None:
+                logger.warning("No commits found in the repository.")
+            else:
+                logger.warning("No commits found in the specified date range.")
             return
 
         logger.info(f"Found {len(commits)} commits. Generating summary...")
