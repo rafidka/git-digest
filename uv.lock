@@ -84,7 +84,7 @@ dev = [
 requires-dist = [
     { name = "gitpython", specifier = ">=3.1.45" },
     { name = "openai", specifier = ">=1.100.0" },
-    { name = "typer", specifier = ">=0.12.1" },
+    { name = "typer", specifier = ">=0.16.1" },
 ]
 
 [package.metadata.requires-dev]
