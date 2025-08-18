@@ -4,7 +4,7 @@ from pathlib import Path
 import typer
 from openai import OpenAI
 
-from .git_utils import GitCommitRetriever
+from .git_utils import GitCommit, GitCommitRetriever
 
 app = typer.Typer()
 
@@ -19,12 +19,12 @@ def get_cohere_client() -> OpenAI:
     return OpenAI(base_url="https://api.cohere.ai/compatibility/v1", api_key=api_key)
 
 
-def format_commits_for_llm(commits) -> str:
+def format_commits_for_llm(commits: list[GitCommit]) -> str:
     """Format git commits for LLM processing."""
     if not commits:
         return "No commits found in the specified date range."
 
-    formatted = []
+    formatted: list[str] = []
     for commit in commits:
         files_str = (
             ", ".join(commit.files_changed)
@@ -63,7 +63,8 @@ Summary:"""
             temperature=0.3,
         )
 
-        return response.choices[0].message.content.strip()
+        content = response.choices[0].message.content
+        return content.strip() if content else ""
 
     except Exception as e:
         typer.echo(f"Error calling Cohere API: {str(e)}", err=True)
@@ -111,7 +112,7 @@ def recap(
             commits = retriever.get_recent_commits(days)
         else:
             if since or until:
-                date_info = []
+                date_info: list[str] = []
                 if since:
                     date_info.append(f"since {since}")
                 if until:
@@ -123,6 +124,8 @@ def recap(
 
             if since or until:
                 commits = retriever.get_commits(since=since, until=until)
+            else:
+                commits = retriever.get_recent_commits(7)
 
         if not commits:
             typer.echo("No commits found in the specified date range.")

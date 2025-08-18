@@ -1,11 +1,13 @@
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 from git import Repo
 
 
 @dataclass
 class GitCommit:
+    """Git commit data container."""
     hash: str
     author: str
     email: str
@@ -15,6 +17,7 @@ class GitCommit:
 
 
 class GitCommitRetriever:
+    """Utility to retrieve and parse git commits."""
     def __init__(self, repo_path: str = "."):
         self.repo = Repo(repo_path)
 
@@ -31,16 +34,16 @@ class GitCommitRetriever:
         Returns:
             List of GitCommit objects
         """
-        kwargs = {}
+        kwargs: dict[str, Any] = {}
         if since:
             kwargs["since"] = since
         if until:
             kwargs["until"] = until
 
-        commits = []
+        commits: list[GitCommit] = []
         for commit in self.repo.iter_commits(**kwargs):
             # Get list of files changed in this commit
-            files_changed = []
+            files_changed: list[str] = []
             if commit.parents:
                 # Compare with first parent to get changed files
                 for diff in commit.diff(commit.parents[0]):
@@ -51,16 +54,18 @@ class GitCommitRetriever:
             else:
                 # Initial commit - all files are "changed"
                 for item in commit.tree.traverse():
-                    if item.type == "blob":  # It's a file
-                        files_changed.append(item.path)
+                    if hasattr(item, "type") and getattr(item, "type", None) == "blob":  # It's a file
+                        item_path = getattr(item, "path", "")
+                        if item_path:
+                            files_changed.append(str(item_path))
 
             commits.append(
                 GitCommit(
                     hash=commit.hexsha,
-                    author=commit.author.name,
-                    email=commit.author.email,
+                    author=commit.author.name or "Unknown",
+                    email=commit.author.email or "unknown@example.com",
                     date=datetime.fromtimestamp(commit.committed_date),
-                    message=commit.message.strip(),
+                    message=commit.message.strip() if isinstance(commit.message, str) else commit.message.decode().strip(),
                     files_changed=files_changed,
                 )
             )
