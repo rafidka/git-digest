@@ -118,8 +118,6 @@ Summary:"""
         response = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=1000,
-            temperature=0.3,
         )
 
         content = response.choices[0].message.content
