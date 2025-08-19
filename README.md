@@ -28,10 +28,10 @@ repositories.
 pip install git-digest
 ```
 
-### Using uv (recommended)
+### Using pipx (recommended)
 
 ```bash
-uv add git-digest
+pipx install git-digest
 ```
 
 ### From source

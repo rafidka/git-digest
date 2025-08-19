@@ -1,6 +1,6 @@
 [project]
 name = "git-digest"
-version = "0.7.0"
+version = "0.7.1"
 description = "Summarize recent Git contributions into clear, human-readable updates using AI"
 readme = "README.md"
 license = { file = "LICENSE" }
