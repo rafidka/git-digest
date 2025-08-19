@@ -165,6 +165,38 @@ def aggregate_commits_from_repos(
     return all_commits
 
 
+def filter_commits_by_authors(commits: list[GitCommit], author_filters: list[str]) -> tuple[list[GitCommit], dict[str, list[str]]]:
+    """
+    Filter commits by author names using partial matching.
+    
+    Returns:
+        tuple[filtered_commits, {filter: [matched_authors]}]
+    """
+    if not author_filters:
+        return commits, {}
+    
+    # Convert filters to lowercase for case-insensitive matching
+    filters_lower = [f.lower() for f in author_filters]
+    
+    filtered_commits: list[GitCommit] = []
+    matches_per_filter: dict[str, set[str]] = {f: set() for f in author_filters}
+    
+    for commit in commits:
+        author_info = f"{commit.author} <{commit.email}>".lower()
+        
+        # Check if any filter matches this commit's author info
+        for original_filter, filter_lower in zip(author_filters, filters_lower):
+            if filter_lower in author_info:
+                filtered_commits.append(commit)
+                matches_per_filter[original_filter].add(f"{commit.author} <{commit.email}>")
+                break  # Don't duplicate commits if multiple filters match
+    
+    # Convert sets to lists for return value
+    matches_dict = {f: list(matches) for f, matches in matches_per_filter.items()}
+    
+    return filtered_commits, matches_dict
+
+
 def group_commits_by_author(commits: list[GitCommit]) -> dict[str, list[GitCommit]]:
     """Group commits by author email."""
     author_commits: dict[str, list[GitCommit]] = defaultdict(list)
@@ -325,6 +357,11 @@ def recap(
         "--provider",
         help="LLM provider to use (openai, cohere, anthropic)",
     ),
+    authors: list[str] = typer.Option(
+        [],
+        "--authors",
+        help="Filter commits by author names (partial matching, case-insensitive). Supports comma-separated values: --authors 'Alice,Bob' or multiple flags: --authors Alice --authors Bob",
+    ),
 ):
     """
     Generate a human-readable summary of recent git commits.
@@ -337,8 +374,15 @@ def recap(
     if not repo_paths:
         repo_paths = ["."]
     
+    # Parse comma-separated author names and flatten the list
+    parsed_authors: list[str] = []
+    for author_arg in authors:
+        # Split by comma and strip whitespace
+        split_authors = [a.strip() for a in author_arg.split(",") if a.strip()]
+        parsed_authors.extend(split_authors)
+    
     logger.debug(
-        f"Command arguments: repo_paths={repo_paths}, since={since}, until={until}, days={days}, count={count}, by_author={by_author}, provider={provider}"
+        f"Command arguments: repo_paths={repo_paths}, since={since}, until={until}, days={days}, count={count}, by_author={by_author}, provider={provider}, authors={parsed_authors}"
     )
 
     # Validate repositories
@@ -370,7 +414,38 @@ def recap(
                 logger.warning("No commits found in the specified date range.")
             return
 
-        logger.info(f"Found {len(commits)} total commits across {len(valid_repos)} repositories. Generating summary...")
+        # Apply author filtering if specified
+        original_commit_count = len(commits)
+        if parsed_authors:
+            logger.debug(f"Filtering commits by authors: {', '.join(parsed_authors)}")
+            commits, author_matches = filter_commits_by_authors(commits, parsed_authors)
+            
+            # Log matching results
+            matched_filters: list[str] = []
+            unmatched_filters: list[str] = []
+            for filter_name, matched_authors in author_matches.items():
+                if matched_authors:
+                    matched_filters.append(f"{filter_name} ({len(set(matched_authors))} unique authors)")
+                else:
+                    unmatched_filters.append(filter_name)
+            
+            if matched_filters:
+                logger.info(f"Author filter matches: {', '.join(matched_filters)}")
+            if unmatched_filters:
+                logger.warning(f"No commits found for author filters: {', '.join(unmatched_filters)}")
+            
+            logger.info(f"Filtered to {len(commits)} commits from {original_commit_count} total")
+        
+        if not commits:
+            if parsed_authors:
+                logger.warning("No commits found matching the specified author filters.")
+            elif count is not None:
+                logger.warning("No commits found in any repository.")
+            else:
+                logger.warning("No commits found in the specified date range.")
+            return
+
+        logger.info(f"Found {len(commits)} commits across {len(valid_repos)} repositories. Generating summary...")
 
         if by_author:
             logger.debug("Grouping commits by author")
@@ -381,7 +456,10 @@ def recap(
             summary = summarize_by_author(author_commits, provider)
 
             print("\n" + "=" * 60)
-            print("GIT RECAP SUMMARY - BY AUTHOR")
+            header = "GIT RECAP SUMMARY - BY AUTHOR"
+            if parsed_authors:
+                header += " (FILTERED)"
+            print(header)
             print("=" * 60)
             print(summary)
             print("=" * 60)
@@ -393,9 +471,12 @@ def recap(
 
             print("\n" + "=" * 50)
             if len(repo_names) > 1:
-                print(f"GIT RECAP SUMMARY - {len(repo_names)} REPOSITORIES")
+                header = f"GIT RECAP SUMMARY - {len(repo_names)} REPOSITORIES"
             else:
-                print("GIT RECAP SUMMARY")
+                header = "GIT RECAP SUMMARY"
+            if parsed_authors:
+                header += " (FILTERED)"
+            print(header)
             print("=" * 50)
             print(summary)
             print("=" * 50)
