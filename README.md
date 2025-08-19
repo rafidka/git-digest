@@ -2,6 +2,9 @@
 
 [![PyPI version](https://badge.fury.io/py/git-digest.svg)](https://badge.fury.io/py/git-digest)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/rafidka/git-digest/workflows/CI/badge.svg)](https://github.com/rafidka/git-digest/actions)
+[![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 Summarize recent Git contributions into clear, human-readable updates using AI. Perfect
 for standup meetings, progress reports, and understanding what happened in your
@@ -34,7 +37,7 @@ uv add git-digest
 ### From source
 
 ```bash
-git clone https://github.com/your-username/git-digest.git
+git clone https://github.com/rafidka/git-digest.git
 cd git-digest
 uv sync
 ```
@@ -264,7 +267,7 @@ git-digest provides helpful error messages for common issues:
 
 ```bash
 # Clone and setup
-git clone https://github.com/your-username/git-digest.git
+git clone https://github.com/rafidka/git-digest.git
 cd git-digest
 uv sync --dev
 
@@ -286,6 +289,49 @@ uv run pyright
 uv run pre-commit run --all-files
 ```
 
+## Releasing
+
+This project uses automated PyPI publishing via GitHub Actions. To create a new release:
+
+1. **Update the version** in `pyproject.toml`
+2. **Commit the version change**: `git commit -am "Bump version to X.Y.Z"`
+3. **Create a git tag**: `git tag vX.Y.Z`
+4. **Push tag and commits**: `git push && git push --tags`
+5. **Create a GitHub Release** from the tag at https://github.com/rafidka/git-digest/releases/new
+6. **GitHub Actions will automatically**:
+   - Run all quality checks
+   - Build the package
+   - Publish to PyPI
+
+### Setting up PyPI Publishing (First Time)
+
+To enable automatic PyPI publishing, you need to:
+
+1. **Set up PyPI Trusted Publishing**:
+
+   - Go to https://pypi.org/manage/account/publishing/
+   - Add a new publisher for `your-username/git-digest`
+   - Environment name: `pypi`
+
+2. **Create GitHub Environment**:
+   - Go to your repo Settings → Environments
+   - Create environment named `pypi`
+   - No additional protection rules needed (workflow uses OIDC)
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Changelog
+
+### v0.7.0
+
+- Renamed project from `git-recap` to `git-digest`
+- Added comprehensive PyPI metadata
+- Set up automated PyPI publishing workflow
+- Enhanced project documentation
+
+### Previous Versions
+
+- **v0.5.2**: Multi-repository analysis, author filtering, cross-repository coordination
+- **v0.1.0**: Initial release with basic Git commit summarization
