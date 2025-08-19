@@ -1,6 +1,6 @@
 [project]
-name = "git-recap"
-version = "0.6.0"
+name = "git-digest"
+version = "0.7.0"
 description = "Summarize recent Git contributions into clear, human-readable updates using AI"
 readme = "README.md"
 authors = [
@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-git-recap = "git_recap:main"
+git-digest = "git_digest:main"
 
 [build-system]
 requires = ["uv_build>=0.8.11,<0.9.0"]
@@ -37,7 +37,7 @@ venvPath = "."
 line-length = 88
 target-version = "py312"
 include = [
-    "src/git_recap/**/*.py",
+    "src/git_digest/**/*.py",
     "tests/**/*.py",
 ]
 
@@ -50,7 +50,7 @@ extend-select = [
     "I",
     "D",
 ]
-isort = { combine-as-imports = true, known-first-party = ["git_recap"] }
+isort = { combine-as-imports = true, known-first-party = ["git_digest"] }
 mccabe = { max-complexity = 15 }
 ignore = [
     "D100", # ignore missing docstring in module

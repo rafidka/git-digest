@@ -3,15 +3,15 @@ from pathlib import Path
 
 import typer
 
-from git_recap.types import Provider
-from git_recap.utils.git import (
+from git_digest.types import Provider
+from git_digest.utils.git import (
     GitCommit,
     aggregate_commits_from_repos,
     filter_commits_by_authors,
     group_commits_by_author,
     validate_repositories,
 )
-from git_recap.utils.llm import (
+from git_digest.utils.llm import (
     format_commits_for_llm,
     summarize,
     summarize_by_author,
@@ -94,7 +94,7 @@ def generate_and_display_summary(
         summary = summarize_by_author(author_commits, provider)
 
         print("\n" + "=" * 60)
-        header = "GIT RECAP SUMMARY - BY AUTHOR"
+        header = "GIT DIGEST SUMMARY - BY AUTHOR"
         if parsed_authors:
             header += " (FILTERED)"
         print(header)
@@ -109,9 +109,9 @@ def generate_and_display_summary(
 
         print("\n" + "=" * 50)
         if len(repo_names) > 1:
-            header = f"GIT RECAP SUMMARY - {len(repo_names)} REPOSITORIES"
+            header = f"GIT DIGEST SUMMARY - {len(repo_names)} REPOSITORIES"
         else:
-            header = "GIT RECAP SUMMARY"
+            header = "GIT DIGEST SUMMARY"
         if parsed_authors:
             header += " (FILTERED)"
         print(header)
@@ -121,7 +121,7 @@ def generate_and_display_summary(
 
 
 @app.command()
-def recap(
+def digest(
     repo_paths: list[str] = typer.Argument(help="Paths to git repositories to analyze"),
     since: str | None = typer.Option(
         None,
@@ -170,7 +170,7 @@ def recap(
     """
     setup_logging(debug)
     if debug:
-        logger.debug("Starting git-recap with debug logging enabled")
+        logger.debug("Starting git-digest with debug logging enabled")
 
     if not repo_paths:
         logger.error("Please specify at least one repository.")

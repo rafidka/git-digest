@@ -92,8 +92,8 @@ wheels = [
 ]
 
 [[package]]
-name = "git-recap"
-version = "0.6.0"
+name = "git-digest"
+version = "0.7.0"
 source = { editable = "." }
 dependencies = [
     { name = "gitpython" },

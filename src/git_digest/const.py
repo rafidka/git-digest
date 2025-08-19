@@ -1,4 +1,4 @@
-from git_recap.types import Provider
+from git_digest.types import Provider
 
 PROVIDERS = {
     Provider.OPENAI: {

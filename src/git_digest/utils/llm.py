@@ -4,9 +4,9 @@ import os
 import typer
 from openai import OpenAI
 
-from git_recap.const import PROVIDERS
-from git_recap.types import Provider
-from git_recap.utils.git import GitCommit
+from git_digest.const import PROVIDERS
+from git_digest.types import Provider
+from git_digest.utils.git import GitCommit
 
 logger = logging.getLogger(__name__)
 

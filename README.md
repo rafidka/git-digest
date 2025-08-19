@@ -1,6 +1,6 @@
-# git-recap
+# git-digest
 
-[![PyPI version](https://badge.fury.io/py/git-recap.svg)](https://badge.fury.io/py/git-recap)
+[![PyPI version](https://badge.fury.io/py/git-digest.svg)](https://badge.fury.io/py/git-digest)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 
 Summarize recent Git contributions into clear, human-readable updates using AI. Perfect
@@ -22,20 +22,20 @@ repositories.
 ### Using pip
 
 ```bash
-pip install git-recap
+pip install git-digest
 ```
 
 ### Using uv (recommended)
 
 ```bash
-uv add git-recap
+uv add git-digest
 ```
 
 ### From source
 
 ```bash
-git clone https://github.com/your-username/git-recap.git
-cd git-recap
+git clone https://github.com/your-username/git-digest.git
+cd git-digest
 uv sync
 ```
 
@@ -65,22 +65,22 @@ export ANTHROPIC_API_KEY="your-api-key-here"
 
 ```bash
 # Summarize the current repository (last 7 days)
-git-recap .
+git-digest .
 
 # Summarize multiple repositories
-git-recap /path/to/repo1 /path/to/repo2
+git-digest /path/to/repo1 /path/to/repo2
 
 # Use a specific LLM provider
-git-recap . --provider openai
+git-digest . --provider openai
 
 # Get commits from a specific time period
-git-recap . --since "2024-01-01" --until "2024-01-31"
+git-digest . --since "2024-01-01" --until "2024-01-31"
 
 # Focus on specific authors
-git-recap . --authors "alice,bob"
+git-digest . --authors "alice,bob"
 
 # Group summary by author instead of chronological
-git-recap . --by-author
+git-digest . --by-author
 ```
 
 ## Usage Examples
@@ -89,72 +89,72 @@ git-recap . --by-author
 
 ```bash
 # Analyze current directory (default: last 7 days)
-git-recap .
+git-digest .
 
 # Analyze specific repository
-git-recap /path/to/my/project
+git-digest /path/to/my/project
 
 # Multiple repositories
-git-recap ~/projects/frontend ~/projects/backend ~/projects/mobile
+git-digest ~/projects/frontend ~/projects/backend ~/projects/mobile
 ```
 
 ### Time Filtering
 
 ```bash
 # Last N days
-git-recap . --days 14
+git-digest . --days 14
 
 # Last N commits
-git-recap . --count 50
+git-digest . --count 50
 
 # Specific date range
-git-recap . --since "2024-01-01" --until "2024-01-31"
+git-digest . --since "2024-01-01" --until "2024-01-31"
 
 # Natural language dates
-git-recap . --since "last monday" --until "yesterday"
-git-recap . --since "1 week ago"
+git-digest . --since "last monday" --until "yesterday"
+git-digest . --since "1 week ago"
 ```
 
 ### Author Filtering
 
 ```bash
 # Single author (partial matching, case-insensitive)
-git-recap . --authors alice
+git-digest . --authors alice
 
 # Multiple authors
-git-recap . --authors alice,bob,charlie
+git-digest . --authors alice,bob,charlie
 
 # Or using multiple flags
-git-recap . --authors alice --authors bob
+git-digest . --authors alice --authors bob
 ```
 
 ### Summary Modes
 
 ```bash
 # Chronological overview (default)
-git-recap .
+git-digest .
 
 # Group by author
-git-recap . --by-author
+git-digest . --by-author
 
 # Author-focused analysis with time filter
-git-recap . --by-author --days 30 --authors "alice,bob"
+git-digest . --by-author --days 30 --authors "alice,bob"
 ```
 
 ### Advanced Examples
 
 ```bash
 # Debug mode with detailed logging
-git-recap . --debug
+git-digest . --debug
 
 # Multi-repo analysis for the last 2 weeks using OpenAI
-git-recap ~/projects/* --days 14 --provider openai --debug
+git-digest ~/projects/* --days 14 --provider openai --debug
 
 # Focus on recent work by specific team members
-git-recap . --days 7 --authors "alice,bob,charlie" --by-author
+git-digest . --days 7 --authors "alice,bob,charlie" --by-author
 
 # Last 25 commits across multiple repos
-git-recap ~/frontend ~/backend --count 25
+git-digest ~/frontend ~/backend --count 25
 ```
 
 ## Command Line Options
@@ -186,7 +186,7 @@ git-recap ~/frontend ~/backend --count 25
 
 ```
 ==================================================
-GIT RECAP SUMMARY
+GIT DIGEST SUMMARY
 ==================================================
 Based on the recent commits from your repository, here's what's been happening:
 
@@ -215,7 +215,7 @@ The development focus has been on strengthening the authentication system while 
 
 ```
 ============================================================
-GIT RECAP SUMMARY - BY AUTHOR
+GIT DIGEST SUMMARY - BY AUTHOR
 ============================================================
 ## Alice Johnson <alice@company.com> (15 commits)
 
@@ -241,7 +241,7 @@ All environment variables are optional but at least one LLM provider API key is 
 
 ## Error Handling
 
-git-recap provides helpful error messages for common issues:
+git-digest provides helpful error messages for common issues:
 
 - **Missing API keys**: Clear instructions on which environment variable to set
 - **Invalid repositories**: Identifies which paths are not valid git repositories
@@ -264,15 +264,15 @@ git-recap provides helpful error messages for common issues:
 
 ```bash
 # Clone and setup
-git clone https://github.com/your-username/git-recap.git
-cd git-recap
+git clone https://github.com/your-username/git-digest.git
+cd git-digest
 uv sync --dev
 
 # Install pre-commit hooks
 uv run pre-commit install
 
 # Run from source
-uv run git-recap . --help
+uv run git-digest . --help
 
 # Run tests
 uv run pytest
