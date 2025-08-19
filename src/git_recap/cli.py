@@ -5,6 +5,7 @@ import typer
 
 from git_recap.types import Provider
 from git_recap.utils.git import (
+    GitCommit,
     aggregate_commits_from_repos,
     filter_commits_by_authors,
     group_commits_by_author,
@@ -33,11 +34,85 @@ def setup_logging(debug: bool = False) -> None:
     )
 
 
+def parse_author_filters(authors: list[str]) -> list[str]:
+    """Parse comma-separated author names and flatten the list."""
+    parsed_authors: list[str] = []
+    for author_arg in authors:
+        # Split by comma and strip whitespace
+        split_authors = [a.strip() for a in author_arg.split(",") if a.strip()]
+        parsed_authors.extend(split_authors)
+    return parsed_authors
+
+
+def apply_author_filtering(commits: list[GitCommit], parsed_authors: list[str], original_commit_count: int) -> list[GitCommit]:
+    """Apply author filtering and log results."""
+    logger.debug(f"Filtering commits by authors: {', '.join(parsed_authors)}")
+    filtered_commits, author_matches = filter_commits_by_authors(commits, parsed_authors)
+
+    # Log matching results
+    matched_filters: list[str] = []
+    unmatched_filters: list[str] = []
+    for filter_name, matched_authors in author_matches.items():
+        if matched_authors:
+            matched_filters.append(
+                f"{filter_name} ({len(set(matched_authors))} unique authors)"
+            )
+        else:
+            unmatched_filters.append(filter_name)
+
+    if matched_filters:
+        logger.info(f"Author filter matches: {', '.join(matched_filters)}")
+    if unmatched_filters:
+        logger.warning(
+            f"No commits found for author filters: {', '.join(unmatched_filters)}"
+        )
+
+    logger.info(
+        f"Filtered to {len(filtered_commits)} commits from {original_commit_count} total"
+    )
+    return filtered_commits
+
+
+def generate_and_display_summary(commits: list[GitCommit], by_author: bool, provider: Provider, repo_names: list[str], parsed_authors: list[str]) -> None:
+    """Generate and display the summary based on the mode."""
+    if by_author:
+        logger.debug("Grouping commits by author")
+        author_commits = group_commits_by_author(commits)
+        logger.info(f"Found {len(author_commits)} unique authors")
+
+        logger.debug("Generating author-specific summaries")
+        summary = summarize_by_author(author_commits, provider)
+
+        print("\n" + "=" * 60)
+        header = "GIT RECAP SUMMARY - BY AUTHOR"
+        if parsed_authors:
+            header += " (FILTERED)"
+        print(header)
+        print("=" * 60)
+        print(summary)
+        print("=" * 60)
+    else:
+        logger.debug("Formatting commits for LLM processing")
+        commits_text = format_commits_for_llm(commits)
+        logger.debug("Calling LLM for summary generation")
+        summary = summarize(commits_text, provider, repo_names)
+
+        print("\n" + "=" * 50)
+        if len(repo_names) > 1:
+            header = f"GIT RECAP SUMMARY - {len(repo_names)} REPOSITORIES"
+        else:
+            header = "GIT RECAP SUMMARY"
+        if parsed_authors:
+            header += " (FILTERED)"
+        print(header)
+        print("=" * 50)
+        print(summary)
+        print("=" * 50)
+
+
 @app.command()
 def recap(
-    repo_paths: list[str] = typer.Argument(
-        help="Paths to git repositories (defaults to current directory)"
-    ),
+    repo_paths: list[str] = typer.Argument(help="Paths to git repositories to analyze"),
     since: str | None = typer.Option(
         None,
         "--since",
@@ -87,16 +162,11 @@ def recap(
     if debug:
         logger.debug("Starting git-recap with debug logging enabled")
 
-    # Default to current directory if no paths provided
     if not repo_paths:
-        repo_paths = ["."]
+        logger.error("Please specify at least one repository.")
+        raise typer.Exit(1)
 
-    # Parse comma-separated author names and flatten the list
-    parsed_authors: list[str] = []
-    for author_arg in authors:
-        # Split by comma and strip whitespace
-        split_authors = [a.strip() for a in author_arg.split(",") if a.strip()]
-        parsed_authors.extend(split_authors)
+    parsed_authors = parse_author_filters(authors)
 
     logger.debug(
         f"Command arguments: repo_paths={repo_paths}, since={since}, until={until}, days={days}, count={count}, by_author={by_author}, provider={provider}, authors={parsed_authors}"
@@ -136,30 +206,7 @@ def recap(
         # Apply author filtering if specified
         original_commit_count = len(commits)
         if parsed_authors:
-            logger.debug(f"Filtering commits by authors: {', '.join(parsed_authors)}")
-            commits, author_matches = filter_commits_by_authors(commits, parsed_authors)
-
-            # Log matching results
-            matched_filters: list[str] = []
-            unmatched_filters: list[str] = []
-            for filter_name, matched_authors in author_matches.items():
-                if matched_authors:
-                    matched_filters.append(
-                        f"{filter_name} ({len(set(matched_authors))} unique authors)"
-                    )
-                else:
-                    unmatched_filters.append(filter_name)
-
-            if matched_filters:
-                logger.info(f"Author filter matches: {', '.join(matched_filters)}")
-            if unmatched_filters:
-                logger.warning(
-                    f"No commits found for author filters: {', '.join(unmatched_filters)}"
-                )
-
-            logger.info(
-                f"Filtered to {len(commits)} commits from {original_commit_count} total"
-            )
+            commits = apply_author_filtering(commits, parsed_authors, original_commit_count)
 
         if not commits:
             if parsed_authors:
@@ -176,39 +223,7 @@ def recap(
             f"Found {len(commits)} commits across {len(valid_repos)} repositories. Generating summary..."
         )
 
-        if by_author:
-            logger.debug("Grouping commits by author")
-            author_commits = group_commits_by_author(commits)
-            logger.info(f"Found {len(author_commits)} unique authors")
-
-            logger.debug("Generating author-specific summaries")
-            summary = summarize_by_author(author_commits, provider)
-
-            print("\n" + "=" * 60)
-            header = "GIT RECAP SUMMARY - BY AUTHOR"
-            if parsed_authors:
-                header += " (FILTERED)"
-            print(header)
-            print("=" * 60)
-            print(summary)
-            print("=" * 60)
-        else:
-            logger.debug("Formatting commits for LLM processing")
-            commits_text = format_commits_for_llm(commits)
-            logger.debug("Calling LLM for summary generation")
-            summary = summarize(commits_text, provider, repo_names)
-
-            print("\n" + "=" * 50)
-            if len(repo_names) > 1:
-                header = f"GIT RECAP SUMMARY - {len(repo_names)} REPOSITORIES"
-            else:
-                header = "GIT RECAP SUMMARY"
-            if parsed_authors:
-                header += " (FILTERED)"
-            print(header)
-            print("=" * 50)
-            print(summary)
-            print("=" * 50)
+        generate_and_display_summary(commits, by_author, provider, repo_names, parsed_authors)
 
     except Exception as e:
         logger.error(f"Error: {str(e)}")

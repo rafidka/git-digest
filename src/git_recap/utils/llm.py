@@ -19,6 +19,7 @@ def get_llm_client(provider: Provider) -> tuple[OpenAI, str]:
     api_key = os.getenv(api_key_env)
     if not api_key:
         logger.error(f"{api_key_env} environment variable not set")
+        logger.error(f"Please set your {provider.value} API key: export {api_key_env}='your-api-key'")
         raise typer.Exit(1)
 
     logger.debug(f"Initializing {provider} client with OpenAI SDK")
