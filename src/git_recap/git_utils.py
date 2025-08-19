@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from git import Repo
@@ -14,12 +15,14 @@ class GitCommit:
     date: datetime
     message: str
     files_changed: list[str]
+    repo_name: str = ""
 
 
 class GitCommitRetriever:
     """Utility to retrieve and parse git commits."""
     def __init__(self, repo_path: str = "."):
         self.repo = Repo(repo_path)
+        self.repo_name = Path(repo_path).name
 
     def get_commits(
         self, since: str | None = None, until: str | None = None
@@ -67,6 +70,7 @@ class GitCommitRetriever:
                     date=datetime.fromtimestamp(commit.committed_date),
                     message=commit.message.strip() if isinstance(commit.message, str) else commit.message.decode().strip(),
                     files_changed=files_changed,
+                    repo_name=self.repo_name,
                 )
             )
 
@@ -105,6 +109,7 @@ class GitCommitRetriever:
                     date=datetime.fromtimestamp(commit.committed_date),
                     message=commit.message.strip() if isinstance(commit.message, str) else commit.message.decode().strip(),
                     files_changed=files_changed,
+                    repo_name=self.repo_name,
                 )
             )
 

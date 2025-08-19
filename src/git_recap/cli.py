@@ -82,7 +82,7 @@ def format_commits_for_llm(commits: list[GitCommit]) -> str:
             else "No files changed"
         )
         formatted.append(
-            f"Commit: {commit.hash[:8]}\n"
+            f"Commit: {commit.hash[:8]} ({commit.repo_name})\n"
             f"Author: {commit.author} <{commit.email}>\n"
             f"Date: {commit.date.strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"Message: {commit.message}\n"
@@ -90,6 +90,79 @@ def format_commits_for_llm(commits: list[GitCommit]) -> str:
         )
 
     return "\n---\n".join(formatted)
+
+
+def validate_repositories(repo_paths: list[str]) -> tuple[list[str], list[str]]:
+    """Validate repository paths and return (valid_paths, error_messages)."""
+    valid_paths: list[str] = []
+    error_messages: list[str] = []
+    
+    for repo_path in repo_paths:
+        repo_path_obj = Path(repo_path)
+        if not repo_path_obj.exists():
+            error_messages.append(f"Repository path '{repo_path}' does not exist")
+        elif not (repo_path_obj / ".git").exists():
+            error_messages.append(f"'{repo_path}' is not a git repository")
+        else:
+            valid_paths.append(repo_path)
+    
+    return valid_paths, error_messages
+
+
+def process_single_repository(
+    repo_path: str, 
+    since: str | None = None, 
+    until: str | None = None, 
+    days: int | None = None, 
+    count: int | None = None
+) -> list[GitCommit]:
+    """Process a single repository and return commits based on filters."""
+    logger.debug(f"Processing repository: {repo_path}")
+    retriever = GitCommitRetriever(repo_path)
+    
+    # Parameter precedence: count > days > since/until > default
+    if count is not None:
+        logger.debug(f"Getting last {count} commits from {Path(repo_path).name}")
+        return retriever.get_recent_commits_by_count(count)
+    elif days is not None:
+        logger.debug(f"Getting commits from last {days} days from {Path(repo_path).name}")
+        return retriever.get_recent_commits(days)
+    elif since or until:
+        logger.debug(f"Getting commits with date filters from {Path(repo_path).name}")
+        return retriever.get_commits(since=since, until=until)
+    else:
+        logger.debug(f"Getting commits from last 7 days from {Path(repo_path).name}")
+        return retriever.get_recent_commits(7)
+
+
+def aggregate_commits_from_repos(
+    repo_paths: list[str],
+    since: str | None = None,
+    until: str | None = None, 
+    days: int | None = None,
+    count: int | None = None
+) -> list[GitCommit]:
+    """Aggregate commits from multiple repositories."""
+    all_commits: list[GitCommit] = []
+    repo_stats: list[str] = []
+    
+    for repo_path in repo_paths:
+        try:
+            commits = process_single_repository(repo_path, since, until, days, count)
+            all_commits.extend(commits)
+            repo_name = Path(repo_path).name
+            repo_stats.append(f"{repo_name}: {len(commits)} commits")
+        except Exception as e:
+            logger.error(f"Failed to process repository '{repo_path}': {str(e)}")
+            continue
+    
+    if repo_stats:
+        logger.info(f"Repository statistics: {', '.join(repo_stats)}")
+    
+    # Sort by date (newest first) for chronological consistency
+    all_commits.sort(key=lambda c: c.date, reverse=True)
+    
+    return all_commits
 
 
 def group_commits_by_author(commits: list[GitCommit]) -> dict[str, list[GitCommit]]:
@@ -101,13 +174,29 @@ def group_commits_by_author(commits: list[GitCommit]) -> dict[str, list[GitCommi
     return dict(author_commits)
 
 
-def summarize_with_llm(commits_text: str, provider: Provider) -> str:
-    """Use LLM to summarize git commits."""
+def summarize_with_llm(commits_text: str, provider: Provider, repo_names: list[str]) -> str:
+    """Use LLM to summarize git commits from multiple repositories."""
     client, model = get_llm_client(provider)
 
-    prompt = f"""Please provide a clear, human-readable summary of the following git commits. 
-Focus on the key changes, features added, bugs fixed, and overall development progress.
-Group related changes together and highlight the most important updates.
+    if len(repo_names) > 1:
+        repo_context = f"from {len(repo_names)} repositories: {', '.join(repo_names)}"
+        multi_repo_instruction = """
+
+Look for related work across repositories and identify:
+1. Major features or initiatives that span multiple repositories
+2. Coordinated changes and how they work together  
+3. Cross-repository dependencies and integration work
+4. Overall development themes and architectural decisions"""
+    else:
+        repo_context = f"from repository: {repo_names[0]}"
+        multi_repo_instruction = ""
+
+    prompt = f"""Analyze the following git commits {repo_context}.
+
+Provide a clear, human-readable development summary that focuses on:
+- Key changes, features added, and bugs fixed
+- Overall development progress and milestones
+- Important architectural or design decisions{multi_repo_instruction}
 
 Git commits:
 {commits_text}
@@ -135,15 +224,35 @@ def summarize_by_author(
     client, model = get_llm_client(provider)
 
     summaries: list[str] = []
+    
+    # Collect repository info for context (not used in current implementation)
+    all_repos: set[str] = set()
+    for commits in author_commits.values():
+        for commit in commits:
+            if commit.repo_name:
+                all_repos.add(commit.repo_name)
 
     for author, commits in author_commits.items():
         logger.debug(f"Generating summary for {author} ({len(commits)} commits)")
 
         commits_text = format_commits_for_llm(commits)
+        
+        # Count repositories this author worked in
+        author_repos = set(commit.repo_name for commit in commits if commit.repo_name)
+        repo_count = len(author_repos)
+        
+        if repo_count > 1:
+            multi_repo_context = f"""
+This author worked across {repo_count} repositories: {', '.join(sorted(author_repos))}.
+Look for related work across repositories and explain how their changes work together.
+Identify cross-repository coordination and the bigger picture of their contributions."""
+        else:
+            multi_repo_context = ""
 
-        prompt = f"""Please provide a concise summary of the contributions made by {author}.
+        prompt = f"""Provide a comprehensive summary of contributions made by {author}.
+
 Focus on the key changes, features, and improvements they implemented.
-Be specific about what they accomplished.
+Be specific about what they accomplished and the impact of their work.{multi_repo_context}
 
 Commits by {author}:
 {commits_text}
@@ -179,7 +288,7 @@ Summary for {author}:"""
 
 @app.command()
 def recap(
-    repo_path: str = typer.Argument(".", help="Path to the git repository"),
+    repo_paths: list[str] = typer.Argument(help="Paths to git repositories (defaults to current directory)"),
     since: str | None = typer.Option(
         None,
         "--since",
@@ -224,52 +333,44 @@ def recap(
     if debug:
         logger.debug("Starting git-recap with debug logging enabled")
 
+    # Default to current directory if no paths provided
+    if not repo_paths:
+        repo_paths = ["."]
+    
     logger.debug(
-        f"Command arguments: repo_path={repo_path}, since={since}, until={until}, days={days}, count={count}, by_author={by_author}, provider={provider}"
+        f"Command arguments: repo_paths={repo_paths}, since={since}, until={until}, days={days}, count={count}, by_author={by_author}, provider={provider}"
     )
 
-    repo_path_obj = Path(repo_path)
-    if not repo_path_obj.exists():
-        logger.error(f"Repository path '{repo_path}' does not exist")
+    # Validate repositories
+    valid_repos, error_messages = validate_repositories(repo_paths)
+    
+    if error_messages:
+        for error in error_messages:
+            logger.error(error)
+    
+    if not valid_repos:
+        logger.error("No valid repositories found")
         raise typer.Exit(1)
-
-    if not (repo_path_obj / ".git").exists():
-        logger.error(f"'{repo_path}' is not a git repository")
-        raise typer.Exit(1)
-
-    logger.info(f"Analyzing git repository: {repo_path}")
+    
+    repo_names = [Path(repo).name for repo in valid_repos]
+    if len(valid_repos) > 1:
+        logger.info(f"Analyzing {len(valid_repos)} repositories: {', '.join(repo_names)}")
+    else:
+        logger.info(f"Analyzing repository: {repo_names[0]}")
 
     try:
-        logger.debug(f"Initializing GitCommitRetriever for path: {repo_path_obj}")
-        retriever = GitCommitRetriever(str(repo_path_obj))
-
-        # Parameter precedence: count > days > since/until > default
-        if count is not None:
-            logger.info(f"Retrieving the last {count} commits...")
-            commits = retriever.get_recent_commits_by_count(count)
-        elif days is not None:
-            logger.info(f"Retrieving commits from the last {days} days...")
-            commits = retriever.get_recent_commits(days)
-        elif since or until:
-            date_info: list[str] = []
-            if since:
-                date_info.append(f"since {since}")
-            if until:
-                date_info.append(f"until {until}")
-            logger.info(f"Retrieving commits {' '.join(date_info)}...")
-            commits = retriever.get_commits(since=since, until=until)
-        else:
-            logger.info("Retrieving commits from the last 7 days...")
-            commits = retriever.get_recent_commits(7)
+        # Aggregate commits from all repositories
+        logger.debug("Aggregating commits from repositories")
+        commits = aggregate_commits_from_repos(valid_repos, since, until, days, count)
 
         if not commits:
             if count is not None:
-                logger.warning("No commits found in the repository.")
+                logger.warning("No commits found in any repository.")
             else:
                 logger.warning("No commits found in the specified date range.")
             return
 
-        logger.info(f"Found {len(commits)} commits. Generating summary...")
+        logger.info(f"Found {len(commits)} total commits across {len(valid_repos)} repositories. Generating summary...")
 
         if by_author:
             logger.debug("Grouping commits by author")
@@ -288,10 +389,13 @@ def recap(
             logger.debug("Formatting commits for LLM processing")
             commits_text = format_commits_for_llm(commits)
             logger.debug("Calling LLM for summary generation")
-            summary = summarize_with_llm(commits_text, provider)
+            summary = summarize_with_llm(commits_text, provider, repo_names)
 
             print("\n" + "=" * 50)
-            print("GIT RECAP SUMMARY")
+            if len(repo_names) > 1:
+                print(f"GIT RECAP SUMMARY - {len(repo_names)} REPOSITORIES")
+            else:
+                print("GIT RECAP SUMMARY")
             print("=" * 50)
             print(summary)
             print("=" * 50)
