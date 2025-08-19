@@ -19,7 +19,9 @@ def get_llm_client(provider: Provider) -> tuple[OpenAI, str]:
     api_key = os.getenv(api_key_env)
     if not api_key:
         logger.error(f"{api_key_env} environment variable not set")
-        logger.error(f"Please set your {provider.value} API key: export {api_key_env}='your-api-key'")
+        logger.error(
+            f"Please set your {provider.value} API key: export {api_key_env}='your-api-key'"
+        )
         raise typer.Exit(1)
 
     logger.debug(f"Initializing {provider} client with OpenAI SDK")
@@ -62,7 +64,7 @@ def summarize(commits_text: str, provider: Provider, repo_names: list[str]) -> s
 
 Look for related work across repositories and identify:
 1. Major features or initiatives that span multiple repositories
-2. Coordinated changes and how they work together  
+2. Coordinated changes and how they work together
 3. Cross-repository dependencies and integration work
 4. Overall development themes and architectural decisions"""
     else:

@@ -252,10 +252,13 @@ git-recap provides helpful error messages for common issues:
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature-name`
-3. Make your changes and add tests
-4. Run the test suite: `uv run pytest`
-5. Run linting: `uv run ruff check`
-6. Submit a pull request
+3. Install development dependencies: `uv sync --dev`
+4. Install pre-commit hooks: `uv run pre-commit install`
+5. Make your changes and add tests
+6. Run the test suite: `uv run pytest`
+7. Run linting: `uv run ruff check && uv run pyright`
+8. Pre-commit hooks will automatically run on commit, or manually: `uv run pre-commit run --all-files`
+9. Submit a pull request
 
 ## Development
 
@@ -263,7 +266,10 @@ git-recap provides helpful error messages for common issues:
 # Clone and setup
 git clone https://github.com/your-username/git-recap.git
 cd git-recap
-uv sync
+uv sync --dev
+
+# Install pre-commit hooks
+uv run pre-commit install
 
 # Run from source
 uv run git-recap . --help
@@ -275,6 +281,9 @@ uv run pytest
 uv run ruff format
 uv run ruff check
 uv run pyright
+
+# Run all pre-commit checks
+uv run pre-commit run --all-files
 ```
 
 ## License

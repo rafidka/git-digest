@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-and-type-check:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "latest"
+
+    - name: Set up Python
+      run: uv python install 3.12
+
+    - name: Install dependencies
+      run: uv sync --all-extras --dev
+
+    - name: Run pre-commit
+      run: uv run pre-commit run --all-files
+
+    - name: Run ruff check
+      run: uv run ruff check
+
+    - name: Run ruff format check
+      run: uv run ruff format --check
+
+    - name: Run pyright
+      run: uv run pyright
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "latest"
+
+    - name: Set up Python ${{ matrix.python-version }}
+      run: uv python install ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: uv sync --all-extras --dev
+
+    - name: Test package installation
+      run: uv run git-recap --help
+
+    - name: Test basic functionality (without API key)
+      run: |
+        mkdir test-repo
+        cd test-repo
+        git init
+        git config user.email "test@example.com"
+        git config user.name "Test User"
+        echo "test" > test.txt
+        git add .
+        git commit -m "Initial commit"
+        # Test that it fails gracefully without API key
+        if uv run git-recap . 2>&1 | grep -q "API key"; then
+          echo "✓ Properly handles missing API key"
+        else
+          echo "✗ Should fail gracefully when API key is missing"
+          exit 1
+        fi

@@ -24,6 +24,7 @@ build-backend = "uv_build"
 dev = [
     "pyright>=1.1.403",
     "ruff>=0.12.9",
+    "pre-commit>=3.6.0",
 ]
 
 [tool.pyright]

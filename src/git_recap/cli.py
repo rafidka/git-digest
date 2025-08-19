@@ -44,10 +44,14 @@ def parse_author_filters(authors: list[str]) -> list[str]:
     return parsed_authors
 
 
-def apply_author_filtering(commits: list[GitCommit], parsed_authors: list[str], original_commit_count: int) -> list[GitCommit]:
+def apply_author_filtering(
+    commits: list[GitCommit], parsed_authors: list[str], original_commit_count: int
+) -> list[GitCommit]:
     """Apply author filtering and log results."""
     logger.debug(f"Filtering commits by authors: {', '.join(parsed_authors)}")
-    filtered_commits, author_matches = filter_commits_by_authors(commits, parsed_authors)
+    filtered_commits, author_matches = filter_commits_by_authors(
+        commits, parsed_authors
+    )
 
     # Log matching results
     matched_filters: list[str] = []
@@ -73,7 +77,13 @@ def apply_author_filtering(commits: list[GitCommit], parsed_authors: list[str], 
     return filtered_commits
 
 
-def generate_and_display_summary(commits: list[GitCommit], by_author: bool, provider: Provider, repo_names: list[str], parsed_authors: list[str]) -> None:
+def generate_and_display_summary(
+    commits: list[GitCommit],
+    by_author: bool,
+    provider: Provider,
+    repo_names: list[str],
+    parsed_authors: list[str],
+) -> None:
     """Generate and display the summary based on the mode."""
     if by_author:
         logger.debug("Grouping commits by author")
@@ -206,7 +216,9 @@ def recap(
         # Apply author filtering if specified
         original_commit_count = len(commits)
         if parsed_authors:
-            commits = apply_author_filtering(commits, parsed_authors, original_commit_count)
+            commits = apply_author_filtering(
+                commits, parsed_authors, original_commit_count
+            )
 
         if not commits:
             if parsed_authors:
@@ -223,7 +235,9 @@ def recap(
             f"Found {len(commits)} commits across {len(valid_repos)} repositories. Generating summary..."
         )
 
-        generate_and_display_summary(commits, by_author, provider, repo_names, parsed_authors)
+        generate_and_display_summary(
+            commits, by_author, provider, repo_names, parsed_authors
+        )
 
     except Exception as e:
         logger.error(f"Error: {str(e)}")
