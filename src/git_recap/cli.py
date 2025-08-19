@@ -70,7 +70,7 @@ def recap(
         help="Group summary by author instead of chronological overview",
     ),
     provider: Provider = typer.Option(
-        Provider.OPENAI,
+        Provider.COHERE,
         "--provider",
         help="LLM provider to use (openai, cohere, anthropic)",
     ),
