@@ -12,8 +12,8 @@ from git_recap.utils.git import (
 )
 from git_recap.utils.llm import (
     format_commits_for_llm,
+    summarize,
     summarize_by_author,
-    summarize_with_llm,
 )
 
 logger = logging.getLogger(__name__)
@@ -196,7 +196,7 @@ def recap(
             logger.debug("Formatting commits for LLM processing")
             commits_text = format_commits_for_llm(commits)
             logger.debug("Calling LLM for summary generation")
-            summary = summarize_with_llm(commits_text, provider, repo_names)
+            summary = summarize(commits_text, provider, repo_names)
 
             print("\n" + "=" * 50)
             if len(repo_names) > 1:

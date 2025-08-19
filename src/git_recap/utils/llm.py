@@ -51,9 +51,7 @@ def format_commits_for_llm(commits: list[GitCommit]) -> str:
     return "\n---\n".join(formatted)
 
 
-def summarize_with_llm(
-    commits_text: str, provider: Provider, repo_names: list[str]
-) -> str:
+def summarize(commits_text: str, provider: Provider, repo_names: list[str]) -> str:
     """Use LLM to summarize git commits from multiple repositories."""
     client, model = get_llm_client(provider)
 
